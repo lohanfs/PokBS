@@ -1,0 +1,746 @@
+#include "Batalha.h"
+
+
+Batalha::Batalha(void)
+{
+}
+
+
+Batalha::~Batalha(void)
+{
+}
+
+void Batalha::inicializar(Player* playerPtr, Pokemon* oponentePtr,int tipo)
+{
+	battleControl = 0; //controla o fluxo da batalha, fase de escolha, definição de dano e logs.
+
+	char buffer[33];
+
+	batalhando = true;
+	ganhou = false;
+	moveWillDo = -1;
+	controlador = -1;
+	font.carregar("dados/fonts/poke_solid.ttf", 20);
+	
+	// texto battle log
+	
+	battleLog.setFonte(&font);
+	battleLog.setCor(0, 0, 0);
+
+	nBotoes = 17;
+	timer = 0;
+
+	this->playerPtr = playerPtr;
+	myPoke = playerPtr->getPoke();
+	otherPoke = oponentePtr;
+	//HUD and BKG
+	ssBackground.carregar("dados/spritesheets/battle_bkg.png",1, 1);
+	ssBattleHud.carregar("dados/spritesheets/battle_hud.png", 1, 1);
+	ssBarraVida.carregar("dados/spritesheets/barra_vida.png", 1, 1);
+	ssBarraXP.carregar("dados/spritesheets/barra_xp.png", 1, 1);
+
+	// Barras de vida, XP
+	myBarraVida.setSpriteSheet(&ssBarraVida);
+	myBarraVida.setAncora(0, 0.5);
+	myBarraVida.setEscala( myPoke->getVida()/myPoke->getMaxVida(), 1);
+
+	otherBarraVida.setSpriteSheet(&ssBarraVida);
+	otherBarraVida.setAncora(0, 0.5);
+	otherBarraVida.setEscala( otherPoke->getVida()/otherPoke->getMaxVida(), 1);
+
+	myBarraXP.setSpriteSheet(&ssBarraXP);
+	myBarraXP.setAncora(0, 0.5);
+
+	myLife.setFonte(&font);
+	myLife.setCor(0, 255, 0);
+	myLife.setCorBorda(0, 0, 0);
+	myLife.setTamanhoBorda(1);
+	string vidaAtual = itoa(myPoke->getVida(),buffer, 10);
+	string VidaMax = itoa(myPoke->getMaxVida(),buffer,10);
+	myLife.setTexto(vidaAtual+"/"+VidaMax);
+
+	//setar textos (vida, lvl , e nome)
+	myName.setFonte(&font);
+	myName.setTexto(myPoke->getName());
+	myName.setCor(0, 0, 0);
+	myName.setAncora(0, 0.5);
+
+	otherName.setFonte(&font);
+	otherName.setTexto(otherPoke->getName());
+	otherName.setCor(0, 0, 0);
+	otherName.setAncora(0, 0.5);
+
+	myLevel.setFonte(&font);
+	myLevel.setTexto(itoa(myPoke->getLvl(), buffer, 10));
+	myLevel.setCor(0, 0, 0);
+	myLevel.setAncora(0, 0.5);
+
+	otherLevel.setFonte(&font);
+	otherLevel.setTexto(itoa(otherPoke->getLvl(), buffer, 10));
+	otherLevel.setCor(0, 0, 0);
+	otherLevel.setAncora(0, 0.5);
+
+	//BKG battle Hud
+	background.setSpriteSheet(&ssBackground);
+	battleHud.setSpriteSheet(&ssBattleHud);
+	
+	//sprite dos pokes
+	fstream ssSize("dados/spritesheets/pokemon/"+myPoke->getName()+"/back.txt");
+	int ssTamanho;
+	ssSize >> ssTamanho;
+	ssMyPoke.carregar("dados/spritesheets/pokemon/"+ myPoke->getName()+"/back.png", 1, ssTamanho);
+	ssSize.close();
+
+	ssSize.open("dados/spritesheets/pokemon/"+otherPoke->getName()+"/front.txt");
+	ssSize >> ssTamanho;
+	ssOtherPoke.carregar("dados/spritesheets/pokemon/"+otherPoke->getName()+"/front.png", 1, ssTamanho);
+	ssSize.close();
+
+	//setar ss e tempo de animação dos pokemons
+	spriteMyPoke.setAncora(0.5,1);
+	spriteMyPoke.setSpriteSheet(&ssMyPoke);
+	spriteMyPoke.setEscala(3, 3);
+	spriteMyPoke.setVelocidadeAnimacao(6);
+	//outro Pokemon
+	spriteOtherPoke.setAncora(0.5,1);
+	spriteOtherPoke.setSpriteSheet(&ssOtherPoke);
+	spriteOtherPoke.setEscala(2,2);
+	spriteOtherPoke.setVelocidadeAnimacao(6);
+
+
+	// BOTOES!!!
+	ssBotoes = new SpriteSheet[nBotoes];
+	botoes = new BotaoSprite[nBotoes];
+
+	string temp;
+	string fileName;
+	
+	for(int i = 0; i < nBotoes; i++)
+	{
+		temp = itoa(i, buffer, 10);
+		fileName = "dados/spritesheets/botao_batalha"+temp;
+		ssBotoes[i].carregar(fileName+".png", 3, 1);
+		botoes[i].inicializar(&ssBotoes[i]);
+	}
+	//setar posição dos botoes
+	botoes[BATALHAR].setPos(res_x * 0.25, res_y * 0.79);
+	botoes[MOCHILA].setPos(res_x * 0.75, res_y * 0.79);
+	botoes[POKEMON].setPos(res_x * 0.25, res_y * 0.92);
+	botoes[FUGIR].setPos(res_x * 0.75, res_y * 0.92);
+	//menu moves
+	botoes[MOVE1].setPos(res_x * 0.25, res_y * 0.79);
+	botoes[MOVE2].setPos(res_x * 0.75, res_y * 0.79);
+	botoes[MOVE3].setPos(res_x * 0.25, res_y * 0.92);
+	botoes[MOVE4].setPos(res_x * 0.75, res_y * 0.92);
+	//menu itens
+	botoes[ITEM1].setPos(res_x * 0.25, res_y * 0.79);
+	botoes[ITEM2].setPos(res_x * 0.75, res_y * 0.79);
+	botoes[ITEM3].setPos(res_x * 0.25, res_y * 0.92);
+	botoes[ITEM4].setPos(res_x * 0.75, res_y * 0.92);
+	//MENU pokes
+	botoes[POKE1].setPos(res_x * 0.25, res_y * 0.79);
+	botoes[POKE2].setPos(res_x * 0.75, res_y * 0.79);
+	botoes[POKE3].setPos(res_x * 0.25, res_y * 0.92);
+	botoes[POKE4].setPos(res_x * 0.75, res_y * 0.92);
+	botoes[VOLTAR].setPos(res_x/2, res_y * 0.85);
+	
+	//TEXTO E IMAGENS MOVES
+	for(int i = 0; i < 4; i++)
+	{
+		movesName[i].setFonte(&font);
+		movesPP[i].setFonte(&font);
+		//cor
+		movesName[i].setCor(0, 0, 0);
+		movesPP[i].setCor(0, 0, 0);
+	}
+	//imagens
+	
+	
+}
+
+void Batalha::finalizar()
+{
+	font.descarregar();
+	ssBackground.descarregar();
+	ssBattleHud.descarregar();
+	ssMyPoke.descarregar();
+	ssOtherPoke.descarregar();
+	ssBarraVida.descarregar();
+	ssBarraXP.descarregar();
+
+	for(int i = 0; i < nBotoes; i++)
+	{
+		botoes[i].finalizar();
+		ssBotoes[i].descarregar();
+	}
+
+}
+
+void Batalha::executar()
+{
+	background.desenhar(res_x/2, res_y/2);
+	// anim pokes
+	spriteOtherPoke.avancarAnimacao();
+	spriteMyPoke.avancarAnimacao();
+	spriteMyPoke.desenhar(res_x * 0.4, res_y * 0.6);
+	spriteOtherPoke.desenhar(res_x * 0.75, res_y * 0.4);
+	//HUD
+	myBarraVida.desenhar(res_x * 0.635, res_y * 0.637);
+	otherBarraVida.desenhar(res_x * 0.12, res_y * 0.12);
+	battleHud.desenhar(res_x/2, res_y/2);
+	myName.desenhar(res_x * 0.65, res_y * 0.6);
+	myLevel.desenhar(res_x * 0.92, res_y* 0.6);
+	otherName.desenhar(res_x * 0.13, res_y * 0.07);
+	otherLevel.desenhar(res_x * 0.42, res_y * 0.07);
+	myLife.desenhar(res_x * 0.7, res_y * 0.637);
+	//aqui criar os botões e as relações de batalha ( uso de itens, dano dos personagens, etc)
+	 //dar maior foco aqui!
+	if(battleControl == FASE_ESCOLHA)
+	{
+		//testar condições de vitoria
+		if(myPoke->getVida() <= 0 || otherPoke->getVida() <= 0)
+		{
+			batalhando = false;
+		}
+		switch(controlador)
+		{
+		case -1: //tela principal da batalha
+			botoesDesenhar(BATALHAR);
+			botoesDesenhar(MOCHILA);
+			botoesDesenhar(POKEMON);
+			botoesDesenhar(FUGIR);
+			if(teclado.pressionou[TECLA_X])
+			{
+				battleControl = FASE_BATALHA1;
+				timer = 4;
+			}
+			break;
+
+		case BATALHAR:
+			botoesDesenhar(MOVE1);
+			botoesDesenhar(MOVE2);
+			botoesDesenhar(MOVE3);
+			botoesDesenhar(MOVE4);
+			botoesDesenhar(VOLTAR);
+			movesInfoDesenhar();
+			break;
+
+		case MOCHILA:
+			botoesDesenhar(ITEM1);
+			botoesDesenhar(ITEM2);
+			botoesDesenhar(ITEM3);
+			botoesDesenhar(ITEM4);
+			botoesDesenhar(VOLTAR);
+			break;
+
+		case POKEMON:
+			botoesDesenhar(POKE1);
+			botoesDesenhar(POKE2);
+			botoesDesenhar(POKE3);
+			botoesDesenhar(POKE4);
+			botoesDesenhar(VOLTAR);
+			break;
+		//MOVE CHOICES
+		case MOVE1:
+			if(myPoke->getMoves()[0].getID() != 0)
+			{
+				moveWillDo = 0;
+				timer = 4;
+				battleControl = FASE_BATALHA1;
+			}
+			break;
+
+		case MOVE2:
+			if(myPoke->getMoves()[1].getID() != 0)
+			{
+				moveWillDo = 1;
+				timer = 4;
+				battleControl = FASE_BATALHA1;
+			}
+			break;
+
+		case MOVE3:
+			if(myPoke->getMoves()[2].getID() != 0)
+			{
+				moveWillDo = 2;
+				timer = 4;
+				battleControl = FASE_BATALHA1;
+			}
+			break;
+
+		case MOVE4:
+			if(myPoke->getMoves()[3].getID() != 0)
+			{
+				moveWillDo = 3;
+				timer = 4;
+				battleControl = FASE_BATALHA1;
+			}
+			break;
+
+		//ITEM CHOICES
+		case ITEM1:
+			break;
+		
+		case ITEM2:
+			break;
+
+		case ITEM3:
+			break;
+			
+		case ITEM4:
+			break;
+		
+		//POKE CHOICES
+		case POKE1:
+			break;
+
+		case POKE2:
+			break;
+
+		case POKE3:
+			break;
+
+		case POKE4:
+			break;
+
+		case FUGIR:
+			batalhando = false;
+		}
+	}
+	if(battleControl == FASE_BATALHA1) //fase de definição de efeito
+	{
+		if(myPoke->getStats().speed >= otherPoke->getStats().speed)//funcionamento do combate caso meu Poke tiver mais vel
+		{
+			usarMoves(myPoke, otherPoke, &myPoke->getMoves()[moveWillDo]); //usar a move
+			battleControl = BL_NOMEMOVE1;
+		}
+		else //se o outro pokemon for mais rapido ataca primeiro
+		{
+			int randMove = 0;
+			for(int i = 0; i < 4; i++)
+			{
+				if(otherPoke->getMoves()[i].getID() != 0)
+					randMove++;
+			}
+				
+			randMove = rand() % randMove;
+			usarMoves(otherPoke, myPoke, &otherPoke->getMoves()[randMove]);
+
+			battleControl = BL_NOMEMOVE1;
+			timer = 4;
+		}
+	}
+	if (battleControl == BL_NOMEMOVE1) //battle log de quem foi mais rapido
+	{
+		bool alterouVida = false;
+		battleLog.setTexto(moveUsou);
+		battleLog.desenhar(res_x/2, res_y * 0.85);
+
+		if (timer > 0)//contador regressivo
+			timer -= 1 * deltaTempo;
+		else
+		{
+			battleControl = BL_EFFECTIVENESS1;
+			timer = 4;
+		}
+		if (timer < 2 && !alterouVida)
+		{
+			char buffer[33];
+			string vidaAtual = itoa(myPoke->getVida(),buffer, 10);
+			string vidaMax = itoa(myPoke->getMaxVida(),buffer,10);
+			myLife.setTexto(vidaAtual+"/"+vidaMax);
+			// atualiza minha barra de vida
+			float myPercent = myPoke->getVida()/myPoke->getMaxVida();
+			myBarraVida.setEscala(myPercent, 1);
+			//atualiza a barra de vida do outro
+			float otherPercent = otherPoke->getVida()/otherPoke->getMaxVida();
+			otherBarraVida.setEscala(otherPercent, 1);
+			alterouVida = true;
+		}
+	}
+	if(battleControl == BL_EFFECTIVENESS1)
+	{
+		battleLog.setTexto(effective);
+		battleLog.desenhar(res_x/2, res_y * 0.85);
+
+		if (timer > 0)//contador regressivo
+			timer -= 1 * deltaTempo;
+		else if(acertou)// se acertou e vai verificar se morreu
+		{
+			if(otherPoke->getStats().hpAtual <= 0)//se o HP do outro pokemon for inferior ou igual a 0 ele perde
+			{
+				ganhou = true;
+				faint = otherPoke->getName() + " desmaiou.";
+				battleLog.setTexto(faint);
+				battleControl = BL_FAINT1;
+				timer = 4;
+			}
+			if(myPoke->getStats().hpAtual <=0)
+			{
+				ganhou = false;
+				faint = myPoke->getName() + " desmaiou.";
+				battleLog.setTexto(faint);
+				battleControl = BL_FAINT1;
+				timer = 8;
+			}
+			else
+				battleControl = BL_EFFECTS1;//se o pokemon não morreu
+		}
+		else//se errou perde a vez
+		{
+			battleControl = FASE_BATALHA2;
+		}
+	}
+	
+	if(battleControl == BL_FAINT1)
+	{
+		battleLog.setTexto(faint);
+		battleLog.desenhar(res_x/2, res_y * 0.85);
+
+		if (timer > 0)//contador regressivo
+			timer -= 1 * deltaTempo;
+		else//redirecionará para escolher outro poke ou terminará a batalha
+		{
+			battleControl = FASE_ESCOLHA;
+		}
+			
+	}
+
+	if(battleControl == BL_EFFECTS1)
+	{
+		battleControl = FASE_BATALHA2;
+	}
+	
+	if(battleControl == FASE_BATALHA2)
+	{
+		battleControl = FASE_ESCOLHA;
+		controlador = -1;
+	}
+	
+
+			/*battleLog.setTexto(moveUsou);
+			battleLog.desenhar(res_x * 0.5, res_y * 0.85);*/
+
+		//	
+	
+		//if (timer <=0)
+		//{
+		//	char buffer[30];
+		//	//atualiza o texto da vida
+		//	string vidaAtual = itoa(myPoke->getVida(),buffer, 10);
+		//	string vidaMax = itoa(myPoke->getMaxVida(),buffer,10);
+		//	myLife.setTexto(vidaAtual+"/"+vidaMax);
+		//	// atualiza minha barra de vida
+		//	float myPercent = myPoke->getVida()/myPoke->getMaxVida();
+		//	myBarraVida.setEscala(myPercent, 1);
+		//	//atualiza a barra de vida do outro
+		//	float otherPercent = otherPoke->getVida()/otherPoke->getMaxVida();
+		//	otherBarraVida.setEscala(otherPercent, 1);
+		//	
+		//	if(otherPoke->getVida() <= 0)
+		//	{
+		//		ganhou = true;
+		//		batalhando = false;
+		//	}
+		//	if(myPoke->getVida() <= 0)
+		//	{
+		//		ganhou = false;
+		//		batalhando = false;
+		//	}
+		//	
+		//	controlador = -1;
+		//}	
+
+	if(teclado.pressionou[TECLA_Z])
+	{
+		batalhando = false;
+		ganhou = true;
+	}
+	if(teclado.pressionou[TECLA_D])
+	{
+		char buffer[30];
+		myPoke->curar(-2);
+		string vidaAtual = itoa(myPoke->getVida(),buffer, 10);
+		string vidaMax = itoa(myPoke->getMaxVida(),buffer,10);
+		myLife.setTexto(vidaAtual+"/"+vidaMax);
+		float percent = myPoke->getVida()/myPoke->getMaxVida();
+		myBarraVida.setEscala(percent, 1);
+	}
+}
+
+
+void Batalha::botoesDesenhar(int b)
+{
+	botoes[b].atualizar();
+	if(botoes[b].clicou())
+	{
+		if(b != VOLTAR)
+			controlador = b;
+		else
+			controlador = -1;
+	}
+	botoes[b].desenhar();
+}
+
+void Batalha::movesInfoDesenhar()
+{
+	for(int i = 0; i < 4; i++)
+	{
+		char buffer[33];
+		string currentPP = itoa(myPoke->getMoves()[i].getCurrentPP(), buffer, 10);
+		string PP = itoa(myPoke->getMoves()[i].getPP(), buffer, 10);
+		if(myPoke->getMoves()[i].getID() != 0)
+		{
+			movesName[i].setTexto(myPoke->getMoves()[i].getName());
+			movesPP[i].setTexto(currentPP+"/"+PP);
+		}
+		else
+		{
+			movesName[i].setTexto("---");
+			movesPP[i].setTexto("");
+		}
+	}
+	movesName[0].desenhar(res_x * 0.25, res_y * 0.78);
+	movesPP[0].desenhar(res_x * 0.25, res_y * 0.81);
+	movesName[1].desenhar(res_x * 0.75, res_y * 0.78);
+	movesPP[1].desenhar(res_x * 0.75, res_y * 0.81);
+	movesName[2].desenhar(res_x * 0.25, res_y * 0.91);
+	movesPP[2].desenhar(res_x * 0.25, res_y * 0.94);
+	movesName[3].desenhar(res_x * 0.75, res_y * 0.91);
+	movesPP[3].desenhar(res_x * 0.75, res_y * 0.94);
+}
+
+void Batalha::usarMoves(Pokemon* atacante, Pokemon* defensor, Moves* move)
+{
+	moveUsou = atacante->getName() + " usou " + move->getName();
+	if(!move->getTargetSelf()) //se o outro for o alvo
+	{
+		int randChance = rand() % 100 + 1;
+		if(move->getAcc() >= randChance)// teste da acc
+		{
+			if(move->getType() != STATUS)//se for move de dano
+			{
+				acertou = true;
+				float lvlAtacante =  atacante->getLvl();
+				float atk;
+				float def;
+				if(move->getType() == PHYSICAL)
+				{
+					float atk = atacante->getStats().atk;
+					float def = defensor->getStats().def;
+				}
+				else
+				{
+					float atk = atacante->getStats().SpA;
+					float def = defensor->getStats().SpD;
+				}
+				float baseDamage = move->getPower();//dano base da move
+
+				//modifiers
+						//se o tipo da move confere com o do poke atacante 
+				float stab;
+				if(atacante->getElemento() == move->getElement())
+					stab = 1.5;
+				else 
+					stab = 1;
+						//fraquezas tipo da move x tipo do poke afetado
+				float weakness = fraqueza(move->getElement(), defensor->getElemento());
+
+				float random = rand() % 15 + 85;
+				random /= 100;
+				//
+				float dano1 = (2 * lvlAtacante + 10)/250;
+				float dano2 = (atk/def);
+				float dano3 = (baseDamage + 2);
+				float dano4 = (stab * weakness * random);
+
+				float totalDamage = dano1 * dano2 * dano3* dano4;
+
+				defensor->sofrerDano(totalDamage);
+
+				char buffer[33];
+
+				if(weakness == 0.5)
+					effective = "Nao causou muito efeito...";
+				else if(weakness == 2)
+					effective = "Foi super efetivo!";
+				else
+					effective = "none";
+			}
+			else
+			{
+				effective = defensor->getName() +" desviou do ataque"; 
+				acertou = false;
+			}
+		}
+	}
+}
+
+float Batalha::fraqueza(int elemAtk, int elemDef)
+{
+	switch (elemAtk)
+	{
+	case NORMAL:
+		return 1;
+		
+	case FIRE:
+		switch (elemDef)
+		{
+		case NORMAL:
+			return 1;
+		
+		case FIRE:
+			return 0.5;
+
+		case GRASS:
+			return 2;
+
+		case WATER:
+			return 0.5;
+
+		case ICE:
+			return 2;
+
+		case ROCK:
+			return 0.5;
+
+		case FLYING:
+			return 1;
+		}
+
+	case GRASS:
+		switch (elemDef)
+		{
+		case NORMAL:
+			return 1;
+		
+		case FIRE:
+			return 0.5;
+
+		case GRASS:
+			return 0.5;
+
+		case WATER:
+			return 2;
+
+		case ICE:
+			return 0.5;
+
+		case ROCK:
+			return 2;
+
+		case FLYING:
+			return 0.5;
+		}
+
+	case WATER:
+		switch (elemDef)
+		{
+		case NORMAL:
+			return 1;
+		
+		case FIRE:
+			return 2;
+
+		case GRASS:
+			return 0.5;
+
+		case WATER:
+			return 0.5;
+
+		case ICE:
+			return 1;
+
+		case ROCK:
+			return 2;
+
+		case FLYING:
+			return 0.5;
+		}
+
+	case ICE:
+		switch (elemDef)
+		{
+		case NORMAL:
+			return 1;
+		
+		case FIRE:
+			return 0.5;
+
+		case GRASS:
+			return 2;
+
+		case WATER:
+			return 1;
+
+		case ICE:
+			return 0.5;
+
+		case ROCK:
+			return 0.5;
+
+		case FLYING:
+			return 2;
+		}
+
+	case ROCK:
+		switch (elemDef)
+		{
+		case NORMAL:
+			return 1;
+		
+		case FIRE:
+			return 2;
+
+		case GRASS:
+			return 0.5;
+
+		case WATER:
+			return 0.5;
+
+		case ICE:
+			return 2;
+
+		case ROCK:
+			return 0.5;
+
+		case FLYING:
+			return 2;
+		}
+
+	case FLYING:
+		switch (elemDef)
+		{
+		case NORMAL:
+			return 1;
+		
+		case FIRE:
+			return 1;
+
+		case GRASS:
+			return 2;
+
+		case WATER:
+			return 2;
+
+		case ICE:
+			return 0.5;
+
+		case ROCK:
+			return 0.5;
+
+		case FLYING:
+			return 0.5;
+		}
+	}
+}
+
+bool Batalha::getBatalhando()
+{
+	return batalhando;
+}
+
+bool Batalha::getGanhou()
+{
+	return ganhou;
+}
